@@ -21,6 +21,8 @@ jobs:
 
     steps:
       # ── 1. Enable branch protection via GitHub API ──────────────────────────
+      #       Uses PAT_TOKEN (not GITHUB_TOKEN) because branch protection
+      #       requires admin privileges that GITHUB_TOKEN doesn't have
       - name: Enable branch protection on ${{ inputs.branch }}
         run: |
           BRANCH="${{ inputs.branch }}"
@@ -29,8 +31,8 @@ jobs:
           echo "Enabling branch protection on: $BRANCH"
           echo "Required approvals: $APPROVALS"
 
-          curl -s -X PUT \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT \
+            -H "Authorization: Bearer ${{ secrets.PAT_TOKEN }}" \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${{ github.repository }}/branches/${BRANCH}/protection" \
@@ -45,9 +47,21 @@ jobs:
               \"restrictions\": null,
               \"allow_force_pushes\": false,
               \"allow_deletions\": false
-            }"
+            }")
 
-          echo "✅ Branch protection enabled on $BRANCH with $APPROVALS required approval(s)"
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n-1)
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+
+          if [ "$HTTP_CODE" -eq 200 ]; then
+            echo "✅ Branch protection enabled on $BRANCH with $APPROVALS required approval(s)"
+          else
+            echo "❌ Failed to enable branch protection. HTTP: $HTTP_CODE"
+            echo "$BODY"
+            exit 1
+          fi
 
       # ── 2. Verify branch protection was applied ─────────────────────────────
       - name: Verify branch protection
@@ -55,29 +69,29 @@ jobs:
           BRANCH="${{ inputs.branch }}"
 
           RESULT=$(curl -s \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Authorization: Bearer ${{ secrets.PAT_TOKEN }}" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${{ github.repository }}/branches/${BRANCH}/protection")
 
-          REQUIRED=$(echo "$RESULT" | jq '.required_pull_request_reviews.required_approving_review_count')
+          REQUIRED=$(echo "$RESULT" | jq '.required_pull_request_reviews.required_approving_review_count // 0')
           echo "Required approvals confirmed: $REQUIRED"
 
           if [ "$REQUIRED" -ge 1 ]; then
             echo "✅ Branch protection verified successfully"
           else
             echo "❌ Branch protection verification failed"
+            echo "$RESULT"
             exit 1
           fi
 
-      # ── 3. Push a README update to fix freshness rules ───────────────────────
+      # ── 3. Checkout and update README to fix freshness rules ────────────────
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PAT_TOKEN }}
 
       - name: Update README with Port scorecard badge
         run: |
-          # Append a Port scorecard badge section to README
           cat >> README.md << 'EOF'
 
           ---
@@ -95,7 +109,7 @@ jobs:
 
           echo "✅ README updated — freshness rules will now pass after Port GitHub resync"
 
-      # ── 4. Report summary ────────────────────────────────────────────────────
+      # ── 4. Summary ───────────────────────────────────────────────────────────
       - name: Scorecard improvement summary
         run: |
           echo "=========================================="
@@ -109,6 +123,5 @@ jobs:
           echo "  ✅ hasReadme            → PASSING (was passing)"
           echo "------------------------------------------"
           echo "  Expected new scorecard level: B"
-          echo "  (Port GitHub integration will resync"
-          echo "   and update the score automatically)"
+          echo "  Port will resync and update automatically"
           echo "=========================================="
