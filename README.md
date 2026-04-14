@@ -9,3 +9,5 @@ You can run everything locally, explore ranked AI trends for 2026, and reuse the
 This repository is tracked in [Port](https://app.getport.io) as part of the Engineering Catalog.
 Branch protection, code ownership, and deployment tracking are configured to maintain a healthy scorecard.
 *Last updated by automated scorecard workflow.*
+
+Let's add Port AI review automations
