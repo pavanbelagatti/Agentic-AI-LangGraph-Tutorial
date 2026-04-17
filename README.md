@@ -11,3 +11,4 @@ Branch protection, code ownership, and deployment tracking are configured to mai
 *Last updated by automated scorecard workflow.*
 
 Let's add automated PR workflows
+Thank you everyone! 
