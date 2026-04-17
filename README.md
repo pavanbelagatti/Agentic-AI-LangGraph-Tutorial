@@ -10,4 +10,4 @@ This repository is tracked in [Port](https://app.getport.io) as part of the Engi
 Branch protection, code ownership, and deployment tracking are configured to maintain a healthy scorecard.
 *Last updated by automated scorecard workflow.*
 
-Thank you!
+Thank you everyone! 
